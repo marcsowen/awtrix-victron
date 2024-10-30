@@ -32,7 +32,7 @@ def send_to_awtrix(ip, data):
 
 def format_watt(watt: float) -> str:
     if watt >= 1000:
-        return "%.1f kW" % watt
+        return "%.1f kW" % (watt / 1000)
     else:
         return "%d W" % watt
 
