@@ -1,9 +1,9 @@
 #!/usr/bin/python3
-import requests
-from pymodbus.constants import Endian
-from pymodbus.client import ModbusTcpClient
-from pymodbus.payload import BinaryPayloadDecoder
 import time
+import requests
+from pymodbus.client import ModbusTcpClient
+from pymodbus.constants import Endian
+from pymodbus.payload import BinaryPayloadDecoder
 
 
 def send_to_awtrix(ip, data):
@@ -11,7 +11,7 @@ def send_to_awtrix(ip, data):
     json_data = [
         {
             "icon": 18363,
-            "text": "%d W" % data["pv_power"],
+            "text": format_watt(data["pv_power"]),
             "lifetime": 300
         },
         {
@@ -21,13 +21,20 @@ def send_to_awtrix(ip, data):
         },
         {
             "icon": 403,
-            "text": "%d W" % data["ac_power"],
+            "text": format_watt(data["ac_power"]),
             "lifetime": 300
         }
     ]
 
     url = "http://" + ip + "/api/custom?name=solar"
     requests.post(url, json=json_data, headers=headers)
+
+
+def format_watt(watt: float) -> str:
+    if watt >= 1000:
+        return "%.1f kW" % watt
+    else:
+        return "%d W" % watt
 
 
 def main():
