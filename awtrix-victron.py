@@ -8,6 +8,13 @@ from pymodbus.payload import BinaryPayloadDecoder
 
 def send_to_awtrix(ip, data):
     headers = {"Content-Type": "application/json"}
+    bat_soc = data["bat_soc"]
+    bat_soc_icon = 6345
+    if bat_soc >= 30: bat_soc_icon = 6355
+    if bat_soc >= 50: bat_soc_icon = 6356
+    if bat_soc >= 70: bat_soc_icon = 6357
+    if bat_soc == 100: bat_soc_icon = 6358
+
     json_data = [
         {
             "icon": 18363,
@@ -15,7 +22,7 @@ def send_to_awtrix(ip, data):
             "lifetime": 300
         },
         {
-            "icon": 389,
+            "icon": bat_soc_icon,
             "text": "%d %%" % data["bat_soc"],
             "lifetime": 300
         },
