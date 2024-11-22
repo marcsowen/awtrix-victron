@@ -23,7 +23,7 @@ def send_to_awtrix(ip, data):
         },
         {
             "icon": bat_soc_icon,
-            "text": "%d %%" % data["bat_soc"],
+            "text": "%d %%" % bat_soc,
             "lifetime": 300
         },
         {
