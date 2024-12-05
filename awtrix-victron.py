@@ -7,8 +7,10 @@ from pymodbus.client import ModbusTcpClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
-g_last_timestamp = 0
-g_last_price = 0
+g_price_last_timestamp = 0
+g_price_last_price = 0
+g_temp_last_timestamp = 0
+g_temp_last_temperature = 0
 
 def send_to_awtrix(ip, data):
     bat_soc = data["bat_soc"]
@@ -42,6 +44,10 @@ def send_to_awtrix(ip, data):
             "icon": price_icon,
             "text": "%.2f" % price,
             "lifetime": 300
+        },
+        {
+            "text": "%.1f °C" % data["temperature"],
+            "lifetime": 300
         }
     ]
 
@@ -62,11 +68,11 @@ def get_energy_price() -> float:
     current_timestamp = int(time.time())
     current_hour_timestamp = current_timestamp - (current_timestamp % 3600)
 
-    global g_last_timestamp
-    global g_last_price
+    global g_price_last_timestamp
+    global g_price_last_price
 
-    if current_hour_timestamp == g_last_timestamp:
-        return g_last_price
+    if current_hour_timestamp == g_price_last_timestamp:
+        return g_price_last_price
 
     response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU").content.decode('UTF-8'))
     index = response["unix_seconds"].index(current_hour_timestamp)
@@ -74,10 +80,29 @@ def get_energy_price() -> float:
 
     price = (stock_price * 1.19) + 0.1984 # Green Planet Energy Ökostrom flex
 
-    g_last_timestamp = current_hour_timestamp
-    g_last_price = price
+    g_price_last_timestamp = current_hour_timestamp
+    g_price_last_price = price
 
     return price
+
+def get_outside_temperature() -> float:
+    current_timestamp = int(time.time())
+    current_5_minute_timestamp = current_timestamp - (current_timestamp % 300)
+
+    global g_temp_last_timestamp
+    global g_temp_last_temperature
+
+    if current_5_minute_timestamp == g_temp_last_timestamp:
+        return g_temp_last_temperature
+
+    response = json.loads(requests.get("https://app-prod-ws.warnwetter.de/v30/currentMeasurements?stationIds=E298").content.decode('UTF-8'))
+    temperature = response["data"]["E298"]["temperature"] / 10
+
+    g_temp_last_timestamp = current_5_minute_timestamp
+    g_temp_last_temperature = temperature
+
+    return temperature
+
 
 def main():
     print("awtrix-victron v1.1")
@@ -104,13 +129,15 @@ def main():
         decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
         yield_2 = decoder.decode_16bit_uint() / 10
         energy_price = get_energy_price()
+        temperature = get_outside_temperature()
 
         data = {
             "ac_power": l1 + l2 + l3,
             "pv_power": pv_p,
             "pv_yield": yield_1 + yield_2,
             "bat_soc": soc,
-            "price": energy_price
+            "price": energy_price,
+            "temperature": temperature
         }
 
         send_to_awtrix(awtrix_ip, data)
