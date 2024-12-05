@@ -12,16 +12,7 @@ g_last_price = 0
 
 def send_to_awtrix(ip, data):
     bat_soc = data["bat_soc"]
-    if bat_soc < 40:
-        bat_soc_icon = 6354 # 20%
-    elif 40 <= bat_soc < 60:
-        bat_soc_icon = 6355 # 40%
-    elif 60 <= bat_soc < 80:
-        bat_soc_icon = 6356 # 60%
-    elif 80 <= bat_soc < 100:
-        bat_soc_icon = 6357 # 80%
-    else:
-        bat_soc_icon = 6358 # 100%
+    bat_soc_icon = 6354 + int(bat_soc / 25)
 
     price = data["price"]
     if price < 0.30:
