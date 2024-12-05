@@ -87,18 +87,18 @@ def get_energy_price() -> float:
 
 def get_outside_temperature() -> float:
     current_timestamp = int(time.time())
-    current_5_minute_timestamp = current_timestamp - (current_timestamp % 300)
+    current_15_minute_timestamp = current_timestamp - (current_timestamp % 900)
 
     global g_temp_last_timestamp
     global g_temp_last_temperature
 
-    if current_5_minute_timestamp == g_temp_last_timestamp:
+    if current_15_minute_timestamp == g_temp_last_timestamp:
         return g_temp_last_temperature
 
     response = json.loads(requests.get("https://app-prod-ws.warnwetter.de/v30/currentMeasurements?stationIds=E298").content.decode('UTF-8'))
     temperature = response["data"]["E298"]["temperature"] / 10
 
-    g_temp_last_timestamp = current_5_minute_timestamp
+    g_temp_last_timestamp = current_15_minute_timestamp
     g_temp_last_temperature = temperature
 
     return temperature
