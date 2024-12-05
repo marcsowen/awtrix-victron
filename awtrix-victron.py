@@ -119,7 +119,7 @@ def main():
             "pv_power": pv_p,
             "pv_yield": yield_1 + yield_2,
             "bat_soc": soc,
-            "price": price
+            "price": energy_price
         }
 
         send_to_awtrix(awtrix_ip, data)
