@@ -24,6 +24,9 @@ def send_to_awtrix(ip, data):
     else:
         price_icon = 3813 # red
 
+    temperature = data["temperature"]
+    temperature_icon = 21750 - max(min(int((temperature + 20) / 10), 5), 0)
+
     json_data = [
         {
             "icon": 18363,
@@ -46,7 +49,8 @@ def send_to_awtrix(ip, data):
             "lifetime": 300
         },
         {
-            "text": "%.1f °C" % data["temperature"],
+            "icon": temperature_icon,
+            "text": "%.1f" % temperature,
             "lifetime": 300
         }
     ]
