@@ -16,7 +16,7 @@ def send_to_awtrix(ip, data):
     bat_soc = data["bat_soc"]
     bat_soc_icon = 6354 + int(bat_soc / 25)
 
-    price = data["price"]
+    price = round(data["price"], 2)
     if price < 0.30:
         price_icon = 3961 # green
     elif 0.30 <= price < 0.40:
