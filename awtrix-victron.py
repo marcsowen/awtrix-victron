@@ -3,6 +3,7 @@ import json
 import time
 
 import requests
+from datetime import timedelta, datetime
 from pymodbus.client import ModbusTcpClient
 from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
@@ -78,7 +79,8 @@ def get_energy_price() -> float:
     if current_hour_timestamp == g_price_last_timestamp:
         return g_price_last_price
 
-    response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU").content.decode('UTF-8'))
+    next_day = datetime.today() + timedelta(days=1)
+    response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
     index = response["unix_seconds"].index(current_hour_timestamp)
     stock_price = response["price"][index] / 1000
 
