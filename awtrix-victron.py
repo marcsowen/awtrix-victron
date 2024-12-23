@@ -35,13 +35,13 @@ def send_to_awtrix(ip, data):
             "lifetime": 300
         },
         {
-            "icon": bat_soc_icon,
-            "text": "%d %%" % bat_soc,
+            "icon": 403,
+            "text": format_watt(data["ac_power"]),
             "lifetime": 300
         },
         {
-            "icon": 403,
-            "text": format_watt(data["ac_power"]),
+            "icon": bat_soc_icon,
+            "text": "%d %%" % bat_soc,
             "lifetime": 300
         },
         {
