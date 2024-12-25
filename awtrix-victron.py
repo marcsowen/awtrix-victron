@@ -80,7 +80,7 @@ def get_energy_price() -> float:
         return g_price_last_price
 
     next_day = datetime.today() + timedelta(days=1)
-    response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
+    response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
     index = response["unix_seconds"].index(current_hour_timestamp)
     stock_price = response["price"][index] / 1000
 
