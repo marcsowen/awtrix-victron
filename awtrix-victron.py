@@ -53,6 +53,15 @@ def send_to_awtrix(ip, data):
             "icon": temperature_icon,
             "text": "%.1f" % temperature,
             "lifetime": 300
+        },
+        {
+            "icon": 863,
+            "text": "%d %%" % data["humidity"],
+            "lifetime": 300
+        },
+        {
+            "icon": 62630,
+            "text": "%d" % data["pressure"],
         }
     ]
 
@@ -84,14 +93,14 @@ def get_energy_price() -> float:
     index = response["unix_seconds"].index(current_hour_timestamp)
     stock_price = response["price"][index] / 1000
 
-    price = (stock_price * 1.19) + 0.1984 # Green Planet Energy Ökostrom flex
+    price = (stock_price * 1.19) + 0.1978 # Green Planet Energy Ökostrom flex (since 01/2025)
 
     g_price_last_timestamp = current_hour_timestamp
     g_price_last_price = price
 
     return price
 
-def get_outside_temperature() -> float:
+def get_dwd_outside_temperature() -> float:
     current_timestamp = int(time.time())
     current_15_minute_timestamp = current_timestamp - (current_timestamp % 900)
 
@@ -109,11 +118,17 @@ def get_outside_temperature() -> float:
 
     return temperature
 
+def get_outside_weather(ip: str, ble_mac: str):
+    response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
+    return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
+
 
 def main():
     print("awtrix-victron v1.1")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
+    weather_sensor_ip = "192.168.178.157"
+    weather_sensor_ble_mac = "F4:5C:E1:F9:32:21"
 
     client = ModbusTcpClient(victron_ip)
     while True:
@@ -135,7 +150,7 @@ def main():
         decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
         yield_2 = decoder.decode_16bit_uint() / 10
         energy_price = get_energy_price()
-        temperature = get_outside_temperature()
+        weather = get_outside_weather(weather_sensor_ip, weather_sensor_ble_mac)
 
         data = {
             "ac_power": l1 + l2 + l3,
@@ -143,7 +158,9 @@ def main():
             "pv_yield": yield_1 + yield_2,
             "bat_soc": soc,
             "price": energy_price,
-            "temperature": temperature
+            "temperature": weather["temperature"],
+            "humidity": weather["humidity"],
+            "pressure": weather["pressure"]
         }
 
         send_to_awtrix(awtrix_ip, data)
