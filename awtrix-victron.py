@@ -56,12 +56,12 @@ def send_to_awtrix(ip, data):
         },
         {
             "icon": 863,
-            "text": "%d %%" % data["humidity"],
+            "text": "%.0f %%" % data["humidity"],
             "lifetime": 300
         },
         {
             "icon": 62630,
-            "text": "%d" % data["pressure"],
+            "text": "%.0f" % data["pressure"],
         }
     ]
 
