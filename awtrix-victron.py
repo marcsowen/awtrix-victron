@@ -100,28 +100,9 @@ def get_energy_price() -> float:
 
     return price
 
-def get_dwd_outside_temperature() -> float:
-    current_timestamp = int(time.time())
-    current_15_minute_timestamp = current_timestamp - (current_timestamp % 900)
-
-    global g_temp_last_timestamp
-    global g_temp_last_temperature
-
-    if current_15_minute_timestamp == g_temp_last_timestamp:
-        return g_temp_last_temperature
-
-    response = json.loads(requests.get("https://app-prod-ws.warnwetter.de/v30/currentMeasurements?stationIds=E298").content.decode('UTF-8'))
-    temperature = response["data"]["E298"]["temperature"] / 10
-
-    g_temp_last_timestamp = current_15_minute_timestamp
-    g_temp_last_temperature = temperature
-
-    return temperature
-
 def get_outside_weather(ip: str, ble_mac: str):
     response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
     return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
-
 
 def main():
     print("awtrix-victron v1.1")
@@ -143,19 +124,12 @@ def main():
         result = client.read_input_registers(266, 1, slave=225)
         decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
         soc = decoder.decode_16bit_uint() / 10
-        result = client.read_input_registers(784, 1, slave=1)
-        decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
-        yield_1 = decoder.decode_16bit_uint() / 10
-        result = client.read_input_registers(784, 1, slave=100)
-        decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
-        yield_2 = decoder.decode_16bit_uint() / 10
         energy_price = get_energy_price()
         weather = get_outside_weather(weather_sensor_ip, weather_sensor_ble_mac)
 
         data = {
             "ac_power": l1 + l2 + l3,
             "pv_power": pv_p,
-            "pv_yield": yield_1 + yield_2,
             "bat_soc": soc,
             "price": energy_price,
             "temperature": weather["temperature"],
