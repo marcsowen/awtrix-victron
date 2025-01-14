@@ -9,7 +9,7 @@ from pymodbus.constants import Endian
 from pymodbus.payload import BinaryPayloadDecoder
 
 g_price_last_timestamp = 0
-g_price_last_price = 0
+g_price_last_price_result = {}
 g_temp_last_timestamp = 0
 g_temp_last_temperature = 0
 
@@ -17,7 +17,7 @@ def send_to_awtrix(ip, data):
     bat_soc = data["bat_soc"]
     bat_soc_icon = 6354 + int(bat_soc / 25)
 
-    price = round(data["price"], 2)
+    price = round(data["evu_price"], 2)
     if price < 0.30:
         price_icon = 3961 # green
     elif 0.30 <= price < 0.40:
@@ -50,6 +50,11 @@ def send_to_awtrix(ip, data):
             "lifetime": 300
         },
         {
+            "icon": price_icon,
+            "bar": data["evu_price_bars"],
+            "lifetime": 300
+        },
+        {
             "icon": temperature_icon,
             "text": "%.1f" % temperature,
             "lifetime": 300
@@ -78,27 +83,37 @@ def format_watt(watt: float) -> str:
     else:
         return "%d W" % watt
 
-def get_energy_price() -> float:
+def get_energy_price():
     current_timestamp = int(time.time())
     current_hour_timestamp = current_timestamp - (current_timestamp % 3600)
 
     global g_price_last_timestamp
-    global g_price_last_price
+    global g_price_last_price_result
 
     if current_hour_timestamp == g_price_last_timestamp:
-        return g_price_last_price
+        return g_price_last_price_result
 
     next_day = datetime.today() + timedelta(days=1)
     response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
     index = response["unix_seconds"].index(current_hour_timestamp)
-    stock_price = response["price"][index] / 1000
+    end_index = min(len(response["unix_seconds"]) - index, 11) + index
+    current_price = get_evu_price_in_euro(response["price"][index])
+    bar_chart = [int(round(get_evu_price_in_euro(price)*100,0)) for price in response["price"][index:end_index]]
+    bar_char_min_value = min(bar_chart)
+    bar_chart = [value - bar_char_min_value for value in bar_chart]
 
-    price = (stock_price * 1.19) + 0.1978 # Green Planet Energy Ökostrom flex (since 01/2025)
+    result = {
+        "evu_price": current_price,
+        "evu_price_bars": bar_chart
+    }
 
     g_price_last_timestamp = current_hour_timestamp
-    g_price_last_price = price
+    g_price_last_price_result = result
 
-    return price
+    return result
+
+def get_evu_price_in_euro(stock_price: float) -> float:
+    return (stock_price / 1000 * 1.19) + 0.1978 # Green Planet Energy Ökostrom flex (since 01/2025)
 
 def get_outside_weather(ip: str, ble_mac: str):
     response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
@@ -131,7 +146,8 @@ def main():
             "ac_power": l1 + l2 + l3,
             "pv_power": pv_p,
             "bat_soc": soc,
-            "price": energy_price,
+            "evu_price": energy_price["evu_price"],
+            "evu_price_bars": energy_price["evu_price_bars"],
             "temperature": weather["temperature"],
             "humidity": weather["humidity"],
             "pressure": weather["pressure"]
