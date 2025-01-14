@@ -52,6 +52,7 @@ def send_to_awtrix(ip, data):
         {
             "icon": price_icon,
             "bar": data["evu_price_bars"],
+            "autoscale": False,
             "lifetime": 300
         },
         {
@@ -99,8 +100,9 @@ def get_energy_price():
     end_index = min(len(response["unix_seconds"]) - index, 11) + index
     current_price = get_evu_price_in_euro(response["price"][index])
     bar_chart = [get_evu_price_in_euro(price)*100 for price in response["price"][index:end_index]]
-    bar_char_min_value = min(bar_chart)
-    bar_chart_int = [int(round(value - bar_char_min_value, 0)) for value in bar_chart]
+    bar_chart_min_value = min(bar_chart)
+    bar_chart_max_value = max(bar_chart)
+    bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart]
 
     result = {
         "evu_price": current_price,
