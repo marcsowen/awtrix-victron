@@ -99,7 +99,7 @@ def get_energy_price():
     index = response["unix_seconds"].index(current_hour_timestamp)
     end_index = min(len(response["unix_seconds"]) - index, 11) + index
     current_price = get_evu_price_in_euro(response["price"][index])
-    bar_chart = [get_evu_price_in_euro(price) for price in response["price"][index:end_index]]
+    bar_chart = response["price"][index:end_index]
     bar_chart_min_value = min(bar_chart)
     bar_chart_max_value = max(bar_chart)
     bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart]
