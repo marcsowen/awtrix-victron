@@ -59,15 +59,6 @@ def send_to_awtrix(ip, data):
             "icon": temperature_icon,
             "text": "%.1f" % temperature,
             "lifetime": 300
-        },
-        {
-            "icon": 863,
-            "text": "%.0f %%" % data["humidity"],
-            "lifetime": 300
-        },
-        {
-            "icon": 62630,
-            "text": "%.0f" % data["pressure"],
         }
     ]
 
@@ -150,9 +141,7 @@ def main():
             "bat_soc": soc,
             "evu_price": energy_price["evu_price"],
             "evu_price_bars": energy_price["evu_price_bars"],
-            "temperature": weather["temperature"],
-            "humidity": weather["humidity"],
-            "pressure": weather["pressure"]
+            "temperature": weather["temperature"]
         }
 
         send_to_awtrix(awtrix_ip, data)
