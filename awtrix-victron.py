@@ -115,11 +115,11 @@ def get_bar_graph_drawing(heights, colors) -> list:
 
 def get_color_from_price(price: float) -> dict:
     if price < 0.30:
-        return { "color": "#8aff0f", "icon": 3961} # green
+        return { "color": "#00ff00", "icon": 3961} # green
     elif 0.30 <= price < 0.40:
-        return { "color": "#f7f443", "icon": 6256} # yellow
+        return { "color": "#ffff00", "icon": 6256} # yellow
     else:
-        return { "color": "#f70016", "icon": 3813} # red
+        return { "color": "#ff0000", "icon": 3813} # red
 
 def get_evu_price_in_euro(stock_price: float) -> float:
     return round((stock_price / 1000 * 1.19) + 0.1978, 2) # Green Planet Energy Ökostrom flex (since 01/2025)
