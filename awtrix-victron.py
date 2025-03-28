@@ -20,7 +20,7 @@ def send_to_awtrix(ip, data):
     price_icon = data["evu_price"]["icon"]
 
     temperature = data["temperature"]
-    temperature_icon = 21750 - max(min(int((temperature + 20) / 10), 5), 0)
+    temperature_icon = 21750 - max(min(int((temperature + 15) / 10), 5), 0)
 
     json_data = [
         {
