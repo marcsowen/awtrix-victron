@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 import json
 import time
+from datetime import timedelta, datetime
 
 import requests
-from datetime import timedelta, datetime
+import tinytuya
+import yaml
 from pymodbus.client import ModbusTcpClient
-from pymodbus.constants import Endian
-from pymodbus.payload import BinaryPayloadDecoder
 
 g_price_last_timestamp = 0
 g_price_last_price_result = {}
@@ -51,6 +51,11 @@ def send_to_awtrix(ip, data):
         {
             "icon": temperature_icon,
             "text": "%.1f" % temperature,
+            "lifetime": 300
+        },
+        {
+            "icon": 48963,
+            "text": "%.1f" % data["pool_temperature"],
             "lifetime": 300
         }
     ]
@@ -128,35 +133,38 @@ def get_outside_weather(ip: str, ble_mac: str):
     response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
     return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
 
+def get_pool_temp(config: dict) -> float:
+    d = tinytuya.Device(config["device_id"], config["ip_address"], config["local_key"], version=config["version"])
+    return d.status()['dps']['16'] / 10
+
 def main():
-    print("awtrix-victron v1.2")
+    print("awtrix-victron v1.3")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
     weather_sensor_ble_mac = "F4:5C:E1:F9:32:21"
+    config = yaml.safe_load(open("/etc/tuya.yaml"))
 
     client = ModbusTcpClient(victron_ip)
     while True:
-        result = client.read_input_registers(817, 3, slave=100)
-        decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
-        l1 = decoder.decode_16bit_uint()
-        l2 = decoder.decode_16bit_uint()
-        l3 = decoder.decode_16bit_uint()
-        result = client.read_input_registers(850, 1, slave=100)
-        decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
-        pv_p = decoder.decode_16bit_uint()
-        result = client.read_input_registers(266, 1, slave=225)
-        decoder = BinaryPayloadDecoder.fromRegisters(result.registers, byteorder=Endian.BIG)
-        soc = decoder.decode_16bit_uint() / 10
+
+        result = client.read_input_registers(817, count=3, device_id=100)
+        l1, l2, l3 = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16)
+        result = client.read_input_registers(850, count=1, device_id=100)
+        pv_p = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16)
+        result = client.read_input_registers(266, count=1, device_id=225)
+        soc = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16) / 10
         energy_price = get_energy_price()
         weather = get_outside_weather(weather_sensor_ip, weather_sensor_ble_mac)
+        pool_temp = get_pool_temp(config)
 
         data = {
             "ac_power": l1 + l2 + l3,
             "pv_power": pv_p,
             "bat_soc": soc,
             "evu_price": energy_price,
-            "temperature": weather["temperature"]
+            "temperature": weather["temperature"],
+            "pool_temperature": pool_temp
         }
 
         send_to_awtrix(awtrix_ip, data)
