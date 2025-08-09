@@ -22,6 +22,8 @@ def send_to_awtrix(ip, data):
     temperature = data["temperature"]
     temperature_icon = 21750 - max(min(int((temperature + 15) / 10), 5), 0)
 
+    pool_temperature = data["pool_temperature"]
+
     json_data = [
         {
             "icon": 18363,
@@ -55,7 +57,7 @@ def send_to_awtrix(ip, data):
         },
         {
             "icon": 48963,
-            "text": "%.1f" % data["pool_temperature"],
+            "text": "%.1f" % pool_temperature if pool_temperature > 0 else "-",
             "lifetime": 300
         }
     ]
@@ -135,10 +137,13 @@ def get_outside_weather(ip: str, ble_mac: str):
 
 def get_pool_temp(config: dict) -> float:
     d = tinytuya.Device(config["device_id"], config["ip_address"], config["local_key"], version=config["version"])
-    return d.status()['dps']['16'] / 10
+    try:
+        return d.status()['dps']['16'] / 10
+    except KeyError:
+        return -1
 
 def main():
-    print("awtrix-victron v1.3")
+    print("awtrix-victron v1.4")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
