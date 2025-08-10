@@ -135,11 +135,11 @@ def get_outside_weather(ip: str, ble_mac: str):
     response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
     return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
 
-def get_pool_temp(config: dict) -> float:
-    d = tinytuya.Device(config["device_id"], config["ip_address"], config["local_key"], version=config["version"])
+def get_pool_temp() -> float:
     try:
-        return d.status()['dps']['16'] / 10
-    except KeyError:
+        response = json.loads(requests.get("http://localhost:8009").content.decode('UTF-8'))
+        return response["temp_current"]
+    except:
         return -1
 
 def main():
@@ -148,7 +148,6 @@ def main():
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
     weather_sensor_ble_mac = "F4:5C:E1:F9:32:21"
-    config = yaml.safe_load(open("/etc/tuya.yaml"))
 
     client = ModbusTcpClient(victron_ip)
     while True:
@@ -161,7 +160,7 @@ def main():
         soc = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16) / 10
         energy_price = get_energy_price()
         weather = get_outside_weather(weather_sensor_ip, weather_sensor_ble_mac)
-        pool_temp = get_pool_temp(config)
+        pool_temp = get_pool_temp()
 
         data = {
             "ac_power": l1 + l2 + l3,
