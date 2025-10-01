@@ -77,17 +77,17 @@ def format_watt(watt: float) -> str:
 
 def get_energy_price():
     current_timestamp = int(time.time())
-    current_hour_timestamp = current_timestamp - (current_timestamp % 3600)
+    current_quarter_hour_timestamp = current_timestamp - (current_timestamp % 900)
 
     global g_price_last_timestamp
     global g_price_last_price_result
 
-    if current_hour_timestamp == g_price_last_timestamp:
+    if current_quarter_hour_timestamp == g_price_last_timestamp:
         return g_price_last_price_result
 
     next_day = datetime.today() + timedelta(days=1)
     response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
-    index = response["unix_seconds"].index(current_hour_timestamp)
+    index = response["unix_seconds"].index(current_quarter_hour_timestamp)
     end_index = min(len(response["unix_seconds"]) - index, 11) + index
     current_price = get_evu_price_in_euro(response["price"][index])
     bar_chart_stock = response["price"][index:end_index]
@@ -103,7 +103,7 @@ def get_energy_price():
         "bars": get_bar_graph_drawing(bar_chart_int, bar_chart_color),
     }
 
-    g_price_last_timestamp = current_hour_timestamp
+    g_price_last_timestamp = current_quarter_hour_timestamp
     g_price_last_price_result = result
 
     return result
