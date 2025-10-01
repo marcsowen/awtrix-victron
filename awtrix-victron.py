@@ -4,8 +4,6 @@ import time
 from datetime import timedelta, datetime
 
 import requests
-import tinytuya
-import yaml
 from pymodbus.client import ModbusTcpClient
 
 g_price_last_timestamp = 0
