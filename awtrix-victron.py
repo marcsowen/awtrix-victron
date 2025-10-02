@@ -86,7 +86,7 @@ def get_energy_price():
     next_day = datetime.today() + timedelta(days=1)
     response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
     index = response["unix_seconds"].index(current_quarter_hour_timestamp)
-    end_index = min(len(response["unix_seconds"]) - index, 11) + index
+    end_index = min(len(response["unix_seconds"]) - index, 22) + index
     current_price = get_evu_price_in_euro(response["price"][index])
     bar_chart_stock = response["price"][index:end_index]
     bar_chart_min_value = min(bar_chart_stock)
@@ -112,7 +112,7 @@ def get_bar_graph_drawing(heights, colors) -> list:
     result = []
 
     for i in range(0, data_size):
-        x = start_x + i * 2
+        x = start_x + i
         y = 8 - heights[i]
         result.append({"df": [x, y, 1, heights[i], colors[i]["color"]]})
 
