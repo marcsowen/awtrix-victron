@@ -16,9 +16,11 @@ def send_to_awtrix(ip, data):
     bat_soc_icon = 6354 + int(bat_soc / 25)
 
     price_icon = data["evu_price"]["icon"]
+    evu_price = data["evu_price"]["price"]
 
     temperature = data["temperature"]
-    temperature_icon = 21750 - max(min(int((temperature + 15) / 10), 5), 0)
+    if temperature is not None:
+        temperature_icon = 21750 - max(min(int((temperature + 15) / 10), 5), 0)
 
     pool_temperature = data["pool_temperature"]
 
@@ -37,28 +39,34 @@ def send_to_awtrix(ip, data):
             "icon": bat_soc_icon,
             "text": "%d %%" % bat_soc,
             "lifetime": 300
-        },
-        {
+        }
+    ]
+
+    if isinstance(evu_price, (int, float)):
+        json_data.append({
             "icon": price_icon,
-            "text": "%.2f" % data["evu_price"]["price"],
+            "text": "%.2f" % evu_price,
             "lifetime": 300
-        },
-        {
+        })
+        json_data.append({
             "icon": price_icon,
             "draw": data["evu_price"]["bars"],
             "lifetime": 300
-        },
-        {
+        })
+
+    if temperature is not None:
+        json_data.append({
             "icon": temperature_icon,
             "text": "%.1f" % temperature,
             "lifetime": 300
-        },
-        {
+        })
+
+    if pool_temperature is not None:
+        json_data.append({
             "icon": 48963,
-            "text": "%.1f" % pool_temperature if pool_temperature > 0 else "-",
+            "text": "%.1f" % pool_temperature,
             "lifetime": 300
-        }
-    ]
+        })
 
     headers = {"Content-Type": "application/json"}
     url = "http://" + ip + "/api/custom?name=solar"
@@ -83,23 +91,30 @@ def get_energy_price():
     if current_quarter_hour_timestamp == g_price_last_timestamp:
         return g_price_last_price_result
 
-    next_day = datetime.today() + timedelta(days=1)
-    response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
-    index = response["unix_seconds"].index(current_quarter_hour_timestamp)
-    end_index = min(len(response["unix_seconds"]) - index, 22) + index
-    current_price = get_evu_price_in_euro(response["price"][index])
-    bar_chart_stock = response["price"][index:end_index]
-    bar_chart_min_value = min(bar_chart_stock)
-    bar_chart_max_value = max(bar_chart_stock)
-    bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart_stock]
-    bar_chart_euro = [get_evu_price_in_euro(price) for price in bar_chart_stock]
-    bar_chart_color = [get_color_from_price(price) for price in bar_chart_euro]
+    try:
+        next_day = datetime.today() + timedelta(days=1)
+        response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
+        index = response["unix_seconds"].index(current_quarter_hour_timestamp)
+        end_index = min(len(response["unix_seconds"]) - index, 22) + index
+        current_price = get_evu_price_in_euro(response["price"][index])
+        bar_chart_stock = response["price"][index:end_index]
+        bar_chart_min_value = min(bar_chart_stock)
+        bar_chart_max_value = max(bar_chart_stock)
+        bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart_stock]
+        bar_chart_euro = [get_evu_price_in_euro(price) for price in bar_chart_stock]
+        bar_chart_color = [get_color_from_price(price) for price in bar_chart_euro]
 
-    result = {
-        "price": current_price,
-        "icon": get_color_from_price(current_price)["icon"],
-        "bars": get_bar_graph_drawing(bar_chart_int, bar_chart_color),
-    }
+        result = {
+            "price": current_price,
+            "icon": get_color_from_price(current_price)["icon"],
+            "bars": get_bar_graph_drawing(bar_chart_int, bar_chart_color),
+        }
+    except:
+        result = {
+            "price": None,
+            "icon": 6256,
+            "bars": [],
+        }
 
     g_price_last_timestamp = current_quarter_hour_timestamp
     g_price_last_price_result = result
@@ -130,18 +145,22 @@ def get_evu_price_in_euro(stock_price: float) -> float:
     return round((stock_price / 1000 * 1.19) + 0.1978, 2) # Green Planet Energy Ökostrom flex (since 01/2025)
 
 def get_outside_weather(ip: str, ble_mac: str):
-    response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
-    return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
+    try:
+        response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
+        return next(sensor for sensor in response["sensors"] if sensor["ble_mac"] == ble_mac)
+    except:
+        return None
 
-def get_pool_temp() -> float:
+def get_pool_temp() -> float | None:
     try:
         response = json.loads(requests.get("http://localhost:8009").content.decode('UTF-8'))
-        return response["temp_current"]
+        temp_current = response["temp_current"]
+        return temp_current if isinstance(temp_current, (int, float)) else None
     except:
-        return -1
+        return None
 
 def main():
-    print("awtrix-victron v1.4")
+    print("awtrix-victron v1.5")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
@@ -165,7 +184,7 @@ def main():
             "pv_power": pv_p,
             "bat_soc": soc,
             "evu_price": energy_price,
-            "temperature": weather["temperature"],
+            "temperature": weather["temperature"] if weather is not None else None,
             "pool_temperature": pool_temp
         }
 
