@@ -133,7 +133,7 @@ def fetch_tibber(config: dict) -> list:
 
 def get_energy_price(tibber_config: dict):
     current_timestamp = int(time.time())
-    current_hour_timestamp = current_timestamp - (current_timestamp % 3600)
+    current_hour_timestamp = (current_timestamp - 600) - ((current_timestamp - 600) % 3600)
     current_quarter_hour_timestamp = current_timestamp - (current_timestamp % 900)
 
     global g_price_last_timestamp
