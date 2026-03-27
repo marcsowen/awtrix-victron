@@ -1,9 +1,11 @@
 #!/usr/bin/python3
+
 import json
 import time
-from datetime import timedelta, datetime
+from datetime import datetime
 
 import requests
+import yaml
 from pymodbus.client import ModbusTcpClient
 
 g_price_last_timestamp = 0
@@ -81,28 +83,75 @@ def format_watt(watt: float) -> str:
     else:
         return "%d W" % watt
 
-def get_energy_price():
+def fetch_tibber(config: dict) -> list:
+    query = """
+    query FetchPriceInfo($homeId: ID!) {
+      viewer {
+        home(id: $homeId) {
+          currentSubscription {
+            priceInfo(resolution: QUARTER_HOURLY) {
+              today {
+                total
+                startsAt
+              }
+              tomorrow {
+                total
+                startsAt
+              }
+            }
+          }
+        }
+      }
+    }
+    """
+
+    response = json.loads(
+        requests.post(
+            "https://api.tibber.com/v1-beta/gql",
+            json={"query": query, "variables": {"homeId": config["home_id"]}},
+            headers={"Authorization": f"Bearer {config['token']}"},
+        ).content.decode("UTF-8")
+    )
+
+    price_info = (
+        response.get("data", {})
+        .get("viewer", {})
+        .get("home", {})
+        .get("currentSubscription", {})
+        .get("priceInfo", {})
+    )
+
+    return sorted(
+        [
+            {"price": entry["total"], "time": int(datetime.fromisoformat(entry["startsAt"]).timestamp())}
+            for day in ("today", "tomorrow")
+            for entry in (price_info.get(day) or [])
+        ],
+        key=lambda entry: entry["time"],
+    )
+
+
+def get_energy_price(tibber_config: dict):
     current_timestamp = int(time.time())
+    current_hour_timestamp = current_timestamp - (current_timestamp % 3600)
     current_quarter_hour_timestamp = current_timestamp - (current_timestamp % 900)
 
     global g_price_last_timestamp
     global g_price_last_price_result
 
-    if current_quarter_hour_timestamp == g_price_last_timestamp:
+    if current_hour_timestamp == g_price_last_timestamp:
         return g_price_last_price_result
 
     try:
-        next_day = datetime.today() + timedelta(days=1)
-        response = json.loads(requests.get("https://api.energy-charts.info/price?bzn=DE-LU&end=" + next_day.strftime("%Y-%m-%d")).content.decode('UTF-8'))
-        index = response["unix_seconds"].index(current_quarter_hour_timestamp)
-        end_index = min(len(response["unix_seconds"]) - index, 22) + index
-        current_price = get_evu_price_in_euro(response["price"][index])
-        bar_chart_stock = response["price"][index:end_index]
-        bar_chart_min_value = min(bar_chart_stock)
-        bar_chart_max_value = max(bar_chart_stock)
-        bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart_stock]
-        bar_chart_euro = [get_evu_price_in_euro(price) for price in bar_chart_stock]
-        bar_chart_color = [get_color_from_price(price) for price in bar_chart_euro]
+        tibber_prices = fetch_tibber(tibber_config)
+        current_price_index = next(i for i, entry in enumerate(tibber_prices) if entry["time"] == current_quarter_hour_timestamp)
+        end_index = min(len(tibber_prices) - current_price_index, 22) + current_price_index
+        current_price = tibber_prices[current_price_index]["price"]
+        bar_chart_price = [entry["price"] for entry in tibber_prices[current_price_index:end_index]]
+        bar_chart_min_value = min(bar_chart_price)
+        bar_chart_max_value = max(bar_chart_price)
+        bar_chart_int = [int(round((((value - bar_chart_min_value) / (bar_chart_max_value - bar_chart_min_value)) * 7) + 1, 0)) for value in bar_chart_price]
+        bar_chart_color = [get_color_from_price(price) for price in bar_chart_price]
 
         result = {
             "price": current_price,
@@ -116,7 +165,7 @@ def get_energy_price():
             "bars": [],
         }
 
-    g_price_last_timestamp = current_quarter_hour_timestamp
+    g_price_last_timestamp = current_hour_timestamp
     g_price_last_price_result = result
 
     return result
@@ -141,9 +190,6 @@ def get_color_from_price(price: float) -> dict:
     else:
         return { "color": "#ff0000", "icon": 3813} # red
 
-def get_evu_price_in_euro(stock_price: float) -> float:
-    return round((stock_price / 1000 * 1.19) + 0.1978, 2) # Green Planet Energy Ökostrom flex (since 01/2025)
-
 def get_outside_weather(ip: str, ble_mac: str):
     try:
         response = json.loads(requests.get("http://" + ip).content.decode('UTF-8'))
@@ -160,11 +206,14 @@ def get_pool_temp() -> float | None:
         return None
 
 def main():
-    print("awtrix-victron v1.5")
+    print("awtrix-victron v1.6")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
     weather_sensor_ble_mac = "F4:5C:E1:F9:32:21"
+
+    with open("/etc/tibber.yaml", encoding="utf-8") as config_file:
+        tibber_config = yaml.safe_load(config_file)
 
     client = ModbusTcpClient(victron_ip)
     while True:
@@ -175,7 +224,7 @@ def main():
         pv_p = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16)
         result = client.read_input_registers(266, count=1, device_id=225)
         soc = client.convert_from_registers(result.registers, data_type=client.DATATYPE.UINT16) / 10
-        energy_price = get_energy_price()
+        energy_price = get_energy_price(tibber_config)
         weather = get_outside_weather(weather_sensor_ip, weather_sensor_ble_mac)
         pool_temp = get_pool_temp()
 
