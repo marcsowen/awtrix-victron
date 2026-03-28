@@ -8,10 +8,8 @@ import requests
 import yaml
 from pymodbus.client import ModbusTcpClient
 
-g_price_last_timestamp = 0
-g_price_last_price_result = {}
-g_temp_last_timestamp = 0
-g_temp_last_temperature = 0
+g_tibber_last_timestamp = 0
+g_tibber_last_result = []
 
 def send_to_awtrix(ip, data):
     bat_soc = data["bat_soc"]
@@ -84,6 +82,13 @@ def format_watt(watt: float) -> str:
         return "%d W" % watt
 
 def fetch_tibber(config: dict) -> list:
+
+    global g_tibber_last_timestamp
+    global g_tibber_last_result
+
+    if g_tibber_last_timestamp > time.time() - 3600:
+        return g_tibber_last_result
+
     query = """
     query FetchPriceInfo($homeId: ID!) {
       viewer {
@@ -121,7 +126,7 @@ def fetch_tibber(config: dict) -> list:
         .get("priceInfo", {})
     )
 
-    return sorted(
+    result = sorted(
         [
             {"price": entry["total"], "time": int(datetime.fromisoformat(entry["startsAt"]).timestamp())}
             for day in ("today", "tomorrow")
@@ -130,17 +135,15 @@ def fetch_tibber(config: dict) -> list:
         key=lambda entry: entry["time"],
     )
 
+    g_tibber_last_result = result
+    g_tibber_last_timestamp = time.time()
+
+    return result
+
 
 def get_energy_price(tibber_config: dict):
     current_timestamp = int(time.time())
-    current_hour_timestamp = (current_timestamp - 600) - ((current_timestamp - 600) % 3600)
     current_quarter_hour_timestamp = current_timestamp - (current_timestamp % 900)
-
-    global g_price_last_timestamp
-    global g_price_last_price_result
-
-    if current_hour_timestamp == g_price_last_timestamp:
-        return g_price_last_price_result
 
     try:
         tibber_prices = fetch_tibber(tibber_config)
@@ -164,9 +167,6 @@ def get_energy_price(tibber_config: dict):
             "icon": 6256,
             "bars": [],
         }
-
-    g_price_last_timestamp = current_hour_timestamp
-    g_price_last_price_result = result
 
     return result
 
@@ -206,7 +206,7 @@ def get_pool_temp() -> float | None:
         return None
 
 def main():
-    print("awtrix-victron v1.6")
+    print("awtrix-victron v1.7")
     victron_ip = "192.168.178.104"
     awtrix_ip = "192.168.178.143"
     weather_sensor_ip = "192.168.178.157"
